@@ -1,0 +1,146 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Seta da Rodada</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Layout: tela única; o anel giratório é a peça central, toque em qualquer lugar inverte */
+:root{
+  --bg:#141019; --felt:#1f1a28; --fg:#f4eefb; --muted:#a79cb8;
+  --red:#e8443a; --yel:#f5c22b; --grn:#3cb35a; --blu:#2f7de1;
+  --display:"Bowlby One","Arial Black",Impact,sans-serif;
+  --body:"Nunito",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:radial-gradient(circle at 50% 42%,var(--felt),var(--bg) 70%);color:var(--fg);font-family:var(--body);
+  margin:0;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.app{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:20px 16px;box-sizing:border-box;gap:12px;cursor:pointer}
+.top{text-align:center}
+.eyebrow{font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.dir{font-family:var(--display);font-size:clamp(1.8rem,8vw,3rem);line-height:1.05;margin:.25em 0 0;text-wrap:balance;transition:color .3s}
+.stage{flex:1;display:grid;place-items:center;width:100%;min-height:0}
+svg.ring{width:min(86vw,62vh,520px);max-width:100%;aspect-ratio:1;overflow:visible}
+.spin{transform-origin:200px 200px;animation:rot 6s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.flip{transform-origin:200px 200px;transition:transform .45s cubic-bezier(.5,1.6,.5,1)}
+.ccw .flip{transform:scaleX(-1)}
+.pulse{animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+.center-txt{font-family:var(--display);fill:var(--fg)}
+.bottom{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:440px}
+.btns{display:flex;gap:10px;width:100%}
+button{flex:1;font:800 1rem var(--body);border:0;border-radius:14px;padding:14px 10px;cursor:pointer;color:var(--fg);background:#2c2538}
+button:focus-visible{outline:3px solid var(--yel);outline-offset:2px}
+#mic[aria-pressed="true"]{background:var(--red)}
+.hint{font-size:.85rem;color:var(--muted);text-align:center;min-height:2.4em;line-height:1.3}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:30s}.flip{transition:none}}
+</style>
+
+<div class="app" id="app">
+  <div class="top">
+    <div class="eyebrow">Sentido do jogo</div>
+    <h1 class="dir" id="dir">Horário</h1>
+  </div>
+
+  <div class="stage">
+    <svg class="ring" id="ring" viewBox="0 0 400 400" aria-hidden="true">
+      <g class="flip">
+        <g class="spin">
+          <!-- 4 arcos coloridos, cada um com ponta de seta no sentido horário -->
+          <g id="arcs"></g>
+        </g>
+      </g>
+      <circle cx="200" cy="200" r="96" fill="#0d0a12" stroke="#2c2538" stroke-width="3"/>
+      <text class="center-txt" id="glyph" x="200" y="226" text-anchor="middle" font-size="84">↻</text>
+      <text x="200" y="262" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="800" font-size="15" fill="#a79cb8" letter-spacing="2" id="sub">PRÓXIMO À ESQUERDA</text>
+    </svg>
+  </div>
+
+  <div class="bottom">
+    <div class="btns">
+      <button id="flipBtn" type="button">Inverter</button>
+      <button id="mic" type="button" aria-pressed="false">🎤 Voz</button>
+    </div>
+    <div class="hint" id="hint">Toque em qualquer lugar para inverter. Por voz, diga “inverte”, “vira” ou “reverso”.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const NS="http://www.w3.org/2000/svg", cx=200, cy=200, R=150, W=34;
+  const colors=["var(--red)","var(--yel)","var(--grn)","var(--blu)"];
+  const arcs=document.getElementById("arcs");
+  function pt(a,r){const t=(a-90)*Math.PI/180;return [cx+r*Math.cos(t),cy+r*Math.sin(t)]}
+  colors.forEach((c,i)=>{
+    const a0=i*90+6, a1=i*90+70;
+    const [x0,y0]=pt(a0,R),[x1,y1]=pt(a1,R);
+    const p=document.createElementNS(NS,"path");
+    p.setAttribute("d",`M${x0} ${y0} A${R} ${R} 0 0 1 ${x1} ${y1}`);
+    p.style.fill="none";p.style.stroke=c;
+    p.setAttribute("stroke-width",W);p.setAttribute("stroke-linecap","round");
+    arcs.appendChild(p);
+    // ponta da seta
+    const tip=pt(a1+16,R), o=pt(a1,R+W*0.95), n=pt(a1,R-W*0.95);
+    const h=document.createElementNS(NS,"path");
+    h.setAttribute("d",`M${o[0]} ${o[1]} L${tip[0]} ${tip[1]} L${n[0]} ${n[1]} Z`);
+    h.style.fill=c;h.style.stroke=c;h.setAttribute("stroke-width","6");h.setAttribute("stroke-linejoin","round");
+    arcs.appendChild(h);
+  });
+
+  const app=document.getElementById("app"), dir=document.getElementById("dir"),
+        glyph=document.getElementById("glyph"), sub=document.getElementById("sub"),
+        ring=document.getElementById("ring"), hint=document.getElementById("hint"),
+        micBtn=document.getElementById("mic");
+  let ccw=false;
+
+  function render(){
+    app.classList.toggle("ccw",ccw);
+    dir.textContent=ccw?"Anti-horário":"Horário";
+    dir.style.color=ccw?"var(--blu)":"var(--yel)";
+    glyph.textContent=ccw?"↺":"↻";
+    sub.textContent=ccw?"PRÓXIMO À DIREITA":"PRÓXIMO À ESQUERDA";
+    ring.classList.remove("pulse");void ring.getBoundingClientRect();ring.classList.add("pulse");
+    if(navigator.vibrate){try{navigator.vibrate(60)}catch(e){}}
+  }
+  function flip(){ccw=!ccw;render()}
+  function set(v){if(ccw!==v){ccw=v;render()}}
+
+  app.addEventListener("click",e=>{if(e.target.closest("#mic"))return;flip()});
+  document.getElementById("flipBtn").addEventListener("click",e=>{e.stopPropagation();flip()});
+  document.addEventListener("keydown",e=>{if(e.code==="Space"||e.key==="Enter"){e.preventDefault();flip()}});
+
+  // Mantém a tela acesa durante a partida
+  async function wake(){try{if("wakeLock" in navigator)await navigator.wakeLock.request("screen")}catch(e){}}
+  wake();document.addEventListener("visibilitychange",()=>{if(!document.hidden)wake()});
+
+  // Voz
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  let rec=null, listening=false, lastFlip=0;
+  const FLIP=/\b(invert\w*|vira\w*|rever\w*|troca\w*|muda\w*|volta\w*)\b/;
+  function norm(s){return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"")}
+  function handle(t){
+    t=norm(t);const now=Date.now();if(now-lastFlip<1200)return;
+    if(/anti.?horario/.test(t)){set(true);lastFlip=now}
+    else if(/\bhorario\b/.test(t)){set(false);lastFlip=now}
+    else if(FLIP.test(t)){flip();lastFlip=now}
+  }
+  function start(){
+    if(!SR){hint.textContent="Este navegador não reconhece voz. Abra a página no Chrome para usar comandos de voz.";return}
+    rec=new SR();rec.lang="pt-BR";rec.continuous=true;rec.interimResults=true;
+    rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){handle(e.results[i][0].transcript)}};
+    rec.onerror=e=>{
+      if(e.error==="not-allowed"||e.error==="service-not-allowed"){
+        stop();hint.textContent="Microfone bloqueado aqui. Abra o arquivo direto no Chrome e permita o microfone.";
+      }
+    };
+    rec.onend=()=>{if(listening){try{rec.start()}catch(e){}}};
+    try{rec.start();listening=true;micBtn.setAttribute("aria-pressed","true");micBtn.textContent="🎤 Ouvindo";
+      hint.textContent="Ouvindo… diga “inverte”, “vira”, “horário” ou “anti-horário”."}
+    catch(e){hint.textContent="Não foi possível ligar o microfone."}
+  }
+  function stop(){listening=false;if(rec){try{rec.stop()}catch(e){}}micBtn.setAttribute("aria-pressed","false");micBtn.textContent="🎤 Voz"}
+  micBtn.addEventListener("click",e=>{e.stopPropagation();listening?stop():start()});
+
+  render();
+})();
+</script>
